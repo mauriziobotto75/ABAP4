@@ -1,0 +1,235 @@
+REPORT ZFORNIT LINE-SIZE 150.
+
+INCLUDE ZIFORN.
+*tabella dei dati per la creazione dei fornitori
+DATA: TAB TYPE REC OCCURS 0 WITH HEADER LINE.
+
+*struttura utilizzata per caricare i dati del batch input
+DATA: BEGIN OF TABE OCCURS 0.
+             INCLUDE STRUCTURE BDCDATA.
+DATA: END OF TABE.
+DATA: NOME_BDC(12)  VALUE 'CARICA_FORN',
+             NUM_SES TYPE I.
+
+START-OF-SECTION.
+    PERFORM CARICA_TAB.
+    PERFORM APRI_SESSIONE.
+    PERFORM CARICA_DYNPRO.
+    PERFORM CHIUDI_SESSIONE.
+    WRITE:/'CREATA SESSIONE', NOME_BDC, 'DI', NUM_SES, 'TRANSAZIONI'.
+END-OF-SECTION.
+
+
+*-------------------------------------------------------------------------------------------------------------------  *  *Form CARICA_TAB                                                                                                                         *-------------------------------------------------------------------------------------------------------------------  *
+FORM CARICA_TAB.
+
+MOVE 'ENERVIT' TO TAB-FORN.
+MOVE '0001'          TO TAB-DITTA.
+MOVE '0001'          TO TAB-GRP.
+MOVE 'DORA'       TO TAB-NOME.
+MOVE 'TORTORA'  TO TAB-COGNOME.
+MOVE 'SPORT'        TO TAB-MATCH_CODE.
+MOVE 'BB'               TO TAB-PAESE.
+MOVE 'W'                 TO TAB-LINGUA.
+MOVE '05311966'     TO TAB-DATANASCITA.
+MOVE '2'                   TO TAB-SESSO.
+MOVE '0001'             TO TAB-METODO.
+APPEND TAB.
+
+MOVE 'OREAL'     TO TAB-FORN.
+MOVE 'IT01'          TO TAB-DITTA.
+MOVE '0001'          TO TAB-GRP.
+MOVE 'ANTONELLA'       TO TAB-NOME.
+MOVE 'LA TORRE'  TO TAB-COGNOME.
+MOVE 'SUD'        TO TAB-MATCH_CODE.
+MOVE 'EG'               TO TAB-PAESE.
+MOVE 'F'                 TO TAB-LINGUA.
+MOVE '10101971'     TO TAB-DATANASCITA.
+MOVE '2'                   TO TAB-SESSO.
+MOVE '0001'             TO TAB-METODO.
+APPEND TAB.
+MOVE 'MICROSOFT'   TO TAB-FORN.
+MOVE 'SG01'          TO TAB-DITTA.
+MOVE '0001'          TO TAB-GRP.
+MOVE 'MAURIZIO'       TO TAB-NOME.
+MOVE 'BOTTO'  TO TAB-COGNOME.
+MOVE 'GIOVANE'        TO TAB-MATCH_CODE.
+MOVE 'AU'               TO TAB-PAESE.
+MOVE 'E'                 TO TAB-LINGUA.
+MOVE '05301975'     TO TAB-DATANASCITA.
+MOVE '1'                   TO TAB-SESSO.
+MOVE '0001'             TO TAB-METODO.
+APPEND TAB.
+
+ENDFORM.           “CARICA_TAB
+
+*-------------------------------------------------------------------------------------------------------------------*  *Form APRI_SESSIONE                                                                                                                  *
+*-------------------------------------------------------------------------------------------------------------------*
+FORM   APRI_SESSIONE.
+        CALL FUNCTION  'BDC_OPEN_GROUP'
+              EXPORTING   
+                     CLIENT = SY-MANDT
+                     GROUP = NOME_BDC
+                     USER   =  SY-UNAME.
+ENDFORM.        “APRI_SESSIONE
+
+
+
+     *-------------------------------------------------------------------------------------------------------------------*  *Form APRI_SESSIONE                                                                                                                  *
+*-------------------------------------------------------------------------------------------------------------------*
+FORM   APRI_SESSIONE.
+        CALL FUNCTION  'BDC_OPEN_GROUP'
+              EXPORTING   
+                     CLIENT = SY-MANDT
+                     GROUP = NOME_BDC
+                     USER   =  SY-UNAME.
+ENDFORM.        “APRI_SESSIONE
+
+
+     *-------------------------------------------------------------------------------------------------------------------*  *Form  CARICA_DYNPRO                                                                                                         *
+*-------------------------------------------------------------------------------------------------------------------*
+FORM   CARICA_DYNPRO.
+        LOOP AT TAB.  
+              REFRESH TABE.
+              PERFORM DYN_105.
+              PERFORM DYN_110.
+              PERFORM DYN_120.
+              PERFORM DYN_130.
+              PERFORM DYN_210.
+             PERFORM DYN_215.
+             PERFORM DYN_220.
+             PERFORM INSERT_TR.
+     ENDLOOP.
+ENDFORM.             “CARICA_DYNPRO.
+
+
+
+     *-------------------------------------------------------------------------------------------------------------------*  *Form  INSERT_TR                                                                                               *
+*-------------------------------------------------------------------------------------------------------------------*
+FORM   INSERT_TR.
+            CALL FUNCTION  'BDC_INSERT'
+                      EXPORTING 
+                           TCODE = 'FK01'
+                      TABLES
+                           DYNPROTAB = TABE.
+             ADD 1 TO NUM_SES.
+
+ENDFORM.             “INSERT_TR
+
+     *-------------------------------------------------------------------------------------------------------------------*  *Form  BDC_DYNPRO                                                                                         *
+*-------------------------------------------------------------------------------------------------------------------*
+FORM   BDC_DYNPRO  USING PROGRAM DYNPRO.
+            CLEAR TABE.
+            TABE-PROGRAM = PROGRAM.
+            TABE-DYNPRO    = DYNPRO.
+            TABE-DYNBEGIN = 'X'.
+            APPEND TABE.
+ENDFORM.
+
+               “BDC_DYNPRO
+    *-------------------------------------------------------------------------------------------------------------------*  *Form  BDC_FIELD               ------------------------------------------------------------------------------*
+*-------------------------------------------------------------------------------------------------------------------*
+FORM   BDC_FIELD  USING FNAM FVAL.
+            CLEAR TABE.
+            TABE-FNAM = FNAM.
+            TABE-FVAL    = FVAL.
+         
+            APPEND TABE.
+ENDFORM.
+
+               “BDC_DYNPRO
+ *------------------------------------------------------------------------------------------------------------------*
+•	    *-------------------------------------------------------------------------------------------------------------------*  *Form  BDC_FIELD               ------------------------------------------------------------------------------*
+•	*-------------------------------------------------------------------------------------------------------------------*
+ 
+*FORM CALL_TRANS------------------------------------------------------------------------------------------------------------------*
+FORM CALL_TRANS.
+                   CALL TRANSACTION 'FK01' USING TABE MODE 'A' UPDATE 'S'.
+                  IF SY-SUBRC EQ 0.
+                      ADD 1 TO NUM_SES.
+                 ELSE.
+          
+ENDFORM.
+              “CALL_TRANS
+ *------------------------------------------------------------------------------------------------------------------*
+•	FORM  DYN_105
+*------------------------------------------------------------------------------------------------------------
+FORM  DYN_105.
+           
+ PERFORM BDC_DYNPRO USING 'SAPMF02K'    '0105'.
+            PERFORM BDC_FIELD      USING 'RF02K-LIFNR' TAB-FORN.
+             PERFORM BDC_FIELD      USING 'RF02K-BUKRS' TAB-DITTA.
+            PERFORM BDC_FIELD      USING 'RF02K-KTOKK TAB-GRP.
+            PERFORM BDC_FIELD      USING 'BDC_OKCODE' '/0'.    “Enter
+
+ENDFORM.        “DYN_105
+
+
+
+ *------------------------------------------------------------------------------------------------------------------*
+FORM  DYN_110
+*------------------------------------------------------------------------------------------------------------
+FORM  DYN_110.
+           
+ PERFORM BDC_DYNPRO USING 'SAPMF02K'    '0110'.
+            PERFORM BDC_FIELD      USING 'LFA1-NAME1' TAB-NOME.
+             PERFORM BDC_FIELD      USING 'LFA1-NAME2' TAB-COGNOME.
+            PERFORM BDC_FIELD      USING 'LFA1-SORTL' TAB-MATCH_CODE.
+             PERFORM BDC_FIELD      USING 'LFA1-LAND1' TAB-PAESE.
+              PERFORM BDC_FIELD      USING ''LFA1-SPRAS' TAB-LINGUA.
+            PERFORM BDC_FIELD      USING 'BDC_OKCODE' '/0'.    “Enter
+
+ENDFORM.        “DYN_110
+
+*------------------------------------------------------------------------------------------------------------------*
+FORM  DYN_120
+*------------------------------------------------------------------------------------------------------------
+FORM  DYN_120.
+           
+ PERFORM BDC_DYNPRO USING 'SAPMF02K'    '0120'.
+            PERFORM BDC_FIELD      USING 'LFA1-GBDAT' TAB-DATA_NASC.
+             PERFORM BDC_FIELD      USING 'LFA1-SEXKZ' TAB-SESSO.
+           
+            PERFORM BDC_FIELD      USING 'BDC_OKCODE' '/0'.    “Enter
+
+ENDFORM.        “DYN_120
+
+
+*------------------------------------------------------------------------------------------------------------------*
+FORM  DYN_130
+*------------------------------------------------------------------------------------------------------------
+FORM  DYN_130.
+           
+ PERFORM BDC_DYNPRO USING 'SAPMF02K'    '0130'.
+            
+           
+            PERFORM BDC_FIELD      USING 'BDC_OKCODE' '/0'.    “Enter
+
+ENDFORM.        “DYN_120
+
+*------------------------------------------------------------------------------------------------------------------*
+FORM  DYN_210
+*------------------------------------------------------------------------------------------------------------
+FORM  DYN_210.
+           
+ PERFORM BDC_DYNPRO USING 'SAPMF02K'    '0210'.
+            
+           
+            PERFORM BDC_FIELD      USING 'BDC_OKCODE' '/0'.    “Enter
+
+ENDFORM.        “DYN_210.
+
+*------------------------------------------------------------------------------------------------------------------*
+FORM  DYN_215
+*------------------------------------------------------------------------------------------------------------
+FORM  DYN_215.
+           
+ PERFORM BDC_DYNPRO USING 'SAPMF02K'    '0215'.
+            PERFORM BDC_FIELD     USING 'LFB1-ZTERM' TAB-METODO.
+           
+            PERFORM BDC_FIELD      USING 'BDC_OKCODE' '/11'.    “Enter
+
+ENDFORM.        “DYN_215.
+
+
+
