@@ -1,0 +1,21 @@
+        CASE ‘OK_CODE’.
+
+                    WHEN ‘EF03'  OR 'EF12' OR 'EF15'.	
+                                 SET SCREEN 0.
+                                 LEAVE SCREEN.
+
+                    WHEN 'EANZ'.
+                                OK_CODE = 'ZSCVI'.
+                                SET SCREEN  SY-DYNNR.
+                                LEAVE SCREEN.
+
+                    WHEN ‘EAEN'.
+                               OK_CODE = ‘ZSCMO’.
+                               SET  SCREEN  SY-DYNNR.
+
+                    WHEN ‘EANL’.
+                               OK_CODE = ‘ZSCCR'.
+                               SET SCREEN 4100.
+                               LEAVE SCREEN.
+
+         ENDCASE. 
