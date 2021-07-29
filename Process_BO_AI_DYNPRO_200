@@ -1,0 +1,68 @@
+PROCESS   BEFORE-OUTPUT   AFTER-INPUT.  
+
+
+Dynpro ‘0200’
+
+PROCESS BEFORE OUTPUT.
+       MODULE INIT_BOOKING.
+PROCESS AFTER   INPUT.
+       MODULE EXIT-SCREEN AT EXIT-COMMAND.
+       CHAIN.
+            FIELD:  CUSTOMERS-NAME,
+                           SEATS-REQUIRED.
+            MODULE ACTION-BOOKING.
+      ENDCHAIN.
+PROCESS ON VALUE-REQUEST.
+      FIELDS: CUSTOMERS-NAME
+            MODULE  VALUE-CUSTOMERS.
+
+MODULE INIT-BOOKING OUTPUT.
+            SET PF-STATUS C_STATUS-BOOKING.
+            SET TITLEBAR   C_TITLE-BOOKING.
+     SEATS_FREE = (ACTFLI-SEATSMAX) - (ACTFLI-SEATSOCC).
+IF FLAG-KEEP-INPUT = FALSE.
+     CLEAR CUSTOMERS.
+     SEATS-REQUIRED = 1.
+           FLAG-KEEP-INPUT = TRUE.
+END-IF.
+END-MODULE.
+
+MODULE ACTION-BOOKING INPUT.
+         CASE FCODE.
+                    WHEN C_FCODE_BOOKING.
+                                 PERFORM FLIGHT-BOOKING.
+                                 FLAG-KEEP-INPUT = FALSE.
+                    SET SCREEN C-SCREEN-REQUEST.
+                    LEAVE SCREEN.
+          END-CASE,
+ENDMODULE.
+
+MODULE VALUE-CUSTOMERS-INPUT.
+                  CALL SCREEN 110 STARTING AT 10 10
+                                    ENDING AT 30 20.
+ENDMODULE.
+
+DYNPRO ‘110’.
+      PROCESS BEFORE OUTPUT.
+                        MODULE INIT-LIST OUTPUT.
+                        MODULE ACTION-LIST OUTPUT.
+                SET PF-STATUS SPACE.
+                        SUPPRESS DYLOG.
+                            LEAVE TO LIST PROCESSING  AND RETURN TO SCREEN 0.
+ENDMODULE.
+
+MODULE ACTION-LIST OUTPUT.
+                  SELECT * FROM CUSTOMERS INTO TABLE ALL-CUSTOMERS.
+NEW-PAGE NO TITLE.
+                      LOOP AT ALL-CUSTOMERS.
+                                 WRITE: / ALL-CUSTOMERS-NAME
+                                        HIDE ALL-CUSTOMERS-ID.
+		ENDLOOP.
+ENDMODULE.
+
+// INSERIRE LE Z.......E01  nelle include .   Le attivo e scrivo il codice seguente cliccando due volte sull'include.
+AT LINE-SELECTION.
+      READ TABLE ALL-CUSTOMERS WHEN KEY ID = ALL_CUSTOMERS-ID.
+                                CUSTOMERS NAME = ALL-CUSTOMERS-NAME.
+                                LEAVE TO SCREEN 0.
+
