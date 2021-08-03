@@ -1,0 +1,66 @@
+Report ZNEW.
+TABLES: SFLIGHT.
+DATA: BEGIN OF TAB OCCURS 0,
+                           CARRID LIKE SFLI-CARRID,
+                           PRICE     LIKE SFLI-PRICE,
+              END OF TAB.
+DATA: TAB-SUM LIKE TAB OCCURS 0
+                                WITH HEADER LINE,
+             REC-SUM  LIKE TAB,
+             REC            LIKE TAB.
+
+PARAMETERS: AER COMPANY LIKE SFLI-CARRID OBBLIGATORY.
+
+WRITE: / ‘CARRID’  AT        20 'PRICE’.
+
+START-OF-SELECTION.
+
+PERFORM SELEZIONA.
+PERFORM SCRIVI.
+PERFORM STAMPA.
+PERFORM LEGGI.
+
+END-OF-SELECTION.
+
+FORM STAMPA.
+SKIP 3.
+      LOOP AT TAB_SUM.
+                  WRITE: /TAB_SUM-CARRID,
+                                  TAB_SUM-PRICE.
+      ENDLOOP.
+ENDFORM.
+
+
+FORM SCRIVI.
+      LOOP AT TAB.
+            REC_SUM-PRICE = REC_SUM-PRICE + TAB_PRICE.
+            REC_SUM-CARRID = TAB-CARRID.
+            AT END OF CARRID.
+                  IF SY-TABIX NE 1.
+                      MOVE REC_SUM TO TAB_SUM.
+                      APPEND TAB_SUM.
+                      CLEAR REC_SUM.
+                 ENDIF.
+            ENDAT.
+     ENDLOOP.
+ENDFORM.
+
+
+FORM SELEZIONA.
+         SELECT CARRID PRICE FROM SFLIGHT  INTO TAB.
+                         WRITE: / TAB-CARRID,  TAB-PRICE.
+                                            APPEND TAB.
+        ENDSELECT.
+
+
+FORM LEGGI.
+        READ TABLE TAB_SUM WITH KEY  CARRID = AER_COMP.
+                IF SY-SUBRC =  0.
+                     WRITE: / ‘COMPAGNIA AEREA’,  TAB_SUM-CARRID.
+                     WRITE: / ‘PREZZO    TOTALE   ‘,   TAB-SUM-PRICE.
+                ELSE.
+                     SKIP 3.
+                     WRITE TEXT-001,  AER-COMP.
+                     WRITE TEXT-002.
+                ENDIF.
+ENDFORM.
