@@ -1,0 +1,131 @@
+DYNPRO 4100.
+PBO.
+MODULE STATUS_4100.
+MODULE MODIFY-SCREEN.
+PAI.
+MODULE CR_EXIT_COMMAND AT EXIT-COMMAND.
+MODULE CHECK_OK_CODE.
+MODULE CHECK_FUNZIONE.
+MODULE RICERCA_MODELLO.
+MODULE CONTROLLO_DIPENDENTE.
+MODULE SAVE_DIPENDENTE.
+
+
+MODULE STATUS_4100.
+   SET PF-STATUS '4000V'.
+   CLEAR: OK_CODE.
+   
+   CASE OK_CODE.
+        WHEN 'ZSCVI'.
+              SET TITLEBAR '4000V'.
+        WHEN 'ZSCMO'.
+              SET TITLEBAR '4000M'.
+        WHEN 'ZSCR'.
+              MOVE: ZRS001-SOCIETA_CR TO ZRADICE-SOCIETA'
+                    ZRS001-SOCIETA_CR TO ZRADICE-CLASSE
+                    ZRS001-MATRICOLA_CR TO ZRADICE-MATRICOLA.
+                    SET TITLEBAR '4000C'.
+        WHEN 'OTHERS'.
+             CASE SY-TCODE.
+                  WHEN 'ZSCVI'.
+                       SET TITLEBAR '4000V'.
+                  WHEN 'ZSCMO'.
+                       SET TITLEBAR '4000M'.
+    ENDCASE.
+ENDMODULE.
+
+MODULE MODIFY-SCREEN.
+       IF OK_CODE = 'ZSCVI'.
+          LOOP AT SCREEN.
+               IF SCREEN-GROUP1 = 'MOD'.
+                  SCREEN-OUTPUT = 1.
+                  SCREEN-INPUT = 0.
+                  SCREEN-REQUIRED = 0.
+                  MODIFY SCREEN.
+               ENDIF.
+          ENDLOOP.
+      ELSEIF OK_CODE = 'ZSCMO'.
+         LOOP AT SCREEN.
+               IF SCREEN-GROUP1 = 'MOD'.
+                  SCREEN-OUTPUT = 1.
+                  SCREEN-INPUT = 1.
+                  MODIFY SCREEN.
+               ENDIF.
+         ENDLOOP.
+      ELSEIF OK_CODE = 'ZSCMO'.
+        LOOP AT SCREEN.
+             IF SCREEN-GROUP1 = 'MOD'.
+                SCREEN-OUTPUT = 1.
+                SCREEN-INPUT = 1.
+                MODIFY SCREEN.
+             ENDIF.
+             IF SCREEN-GROUP2 = 'OBB'.
+                SCREEN-REQUIRED = 1.
+                MODIFY SCREEN.
+             ELSE.
+                SCREEN-REQUIRED = 0.
+             ENDIF.
+         ENDLOOP.
+       ELSEIF SY-TCODE = 'ZSCVI'.
+        LOOP AT SCREEN.
+            IF SCREEN-GROUP1 = 'MOD'.
+               SCREEN-OUTPUT = 1.
+               SCREEN-INPUT = 0.
+               SCREEN-REQUIRED = 0.
+               MODIFY SCREEN.
+            ENDIF.
+        ENDLOOP.
+       ELSEIF SY-TCODE = 'ZSCMO'.
+        LOOP AT SCREEN.
+           IF SCREEN-GROUP1 = 'MOD'.
+              SCREEN-OUTPUT = 1.
+              SCREEN-INPUT = 1.
+              MODIFY SCREEN.
+           ENDIF.
+           IF SCREEN-GROUP2 = 'OBB'.
+              SCREEN-REQUIRED = 1.
+              MODIFY SCREEN.
+           ELSE.
+              SCREEN-REQUIRED = 0.
+              MODIFY-SCREEN.
+           ENDIF.
+        ENDLOOP.
+      ELSEIF SY-TCODE = 'ZSCCR'.
+           LOOP AT SCREEN.
+              IF SCREEN-GROUP1 = 'MOD'.
+                 SCREEN-INPUT = 1.
+                 SCREEN-OUTPUT = 0.
+                 MODIFY SCREEN.
+              ENDIF.
+              IF SCREEN-GROUP2 = 'OBB'.
+                 SCREEN-REQUIRED = 1.
+                 MODIFY SCREEN.
+              ELSE.
+                 SCREEN-REQUIRED = 0.
+                 MODIFY SCREEN.
+              ENDIF.
+           ENDLOOP.
+       ENDIF.
+ENDMODULE.
+
+MODULE SAVE_DIPENDENTE.
+
+       WHEN 'UPDA'.
+            PERFORM CONTROLLO_SE_MODIFICHE.
+                 IF MODIFICHE_APPORTATE = 'SI'.
+                     IF OK_CODE = 'ZSCMO'
+                       OR SY-TCODE = 'ZSCMO'.
+                          UPDATE ZRADICE.
+                          SAVE_ZRADICE = ZRADICE.
+                            MESSAGE ID_TYPE 'S'.
+       WHEN 'PF03'.
+            PERFORM CONTROLLO_SE_MODIFICHE.
+               IF MODIFICHE_APPORTATE = 'SI'
+                  CALL FUNCTION 'POPUP_TO_CONFIRM_STEP'.
+                       IF ANTWORT = 'J'.
+                          IF OK_CODE = 'ZSCMO'
+                             UPDATE ZRADICE.
+                                SAVE_ZRADICE = ZRADICE.
+ ENDMODULE.
+       
+        
