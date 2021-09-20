@@ -1,0 +1,109 @@
+REPORT ZCALLFUNCTION.
+TABLES: SCUSTOM, SBOOK, SPFLI.
+SELECT-OPTIONS: S_ID FOR SCUSTOM-ID DEFAULT 1 TO 1,
+                         SFLI FOR SBOOK-CARRID,
+                              DEFAULT 'LH' TO 'LH'.
+DATA: CUSTOMERS LIKE SCUSTOM OCCURS 100 WITH HEADER LINE.
+DATA: BOOKINGS LIKE SBOOK OCCURS 1000 WITH HEADER LINE.
+DATA: CONNECTIONS LIKE SPFLI OCCURS 1000 WITH HEADER LINE.
+
+DATA: BEGIN OF SUMS OCCURS 10,
+               FORCURAM LIKE SBOOK-FORCURAM,
+               FORCURKEY LIKE SBOOK-FORCURKEY,
+      END OF SUMS.
+      
+      SELECT * FROM SCUSTOM INTO TABLES CUSTOMERS WHERE ID IN S_IDORDER BY PRIMARY KEY.
+      SELECT * FROM SBOOK INTO TABLE BOOKINGS WHERE CUSTOMID IN s_id
+                                              AND   CARRID   IN S_FLI.
+      SELECT * FROM SPFLI INTO TABLE CONNECTIONS FOR ALL ENTRIES IN BOOKINGS
+                                                 WHERE CARRID = BOOKINGS-CARRID
+                                                   AND CONNID = BOOKINGS-CONNID
+                                                       ORDER BY PRIMARY KEY.
+                                                       
+                CALL FUNCTION 'OPEN_FORM'
+                       DEVICE = 'PRINTER'
+                         FORM = 'S_EXAMPLE_1'
+                       DIALOG = 'x'
+                    EXCEPTIONS
+                       CANCELLED = 1
+                          DEVICE = 2
+                          OTHERS = 6.
+                       IF SY-SUBRC <> 0.
+                          WRITE: / 'ERRORE NELLA OPEN FORM'.
+                       ENDIF.
+                       
+                LOOP AT CUSTOMERS.
+                     SCUSTOM = CUSTOMERS 
+                      CALL FUNCTION 'START_FORM'
+                           EXCEPTION 
+                              OTHERS = 1.
+                           IF SY-SUBRC <> 0.
+                              WRITE: / 'ERRORE IN START FORM'.
+                              EXIT.
+                           ENDIF.
+                      CALL FUNCTION 'WRITE_FORM'
+                              EXPORTING
+                                  ELEMENT = 'HEADING'
+                                  FUNCTION = 'SET'
+                                  TYPE = 'TOP'
+                                  WINDOW = 'MAIN'
+                              EXCEPTIONS 
+                                  OTHERS = 1.
+                      IF SY-SUBRC NE 0.
+                         WRITE: / 'ERRORE IN WRITE'.
+                      ENDIF.
+               CLEAR SUMS.
+               REFRESH SUMS.
+               LOOP AT BOOKINGS.
+                    WHERE CUSTOMID = CUSTOMERS-ID.
+                          SBOOK = BOOKINGS.
+                    READ TABLE CONNECTIONS WITH KEY CARRID = BOOKINGS-CARRID
+                                                AND CONNID = BOOKINGS-CONNID.
+                                           IF SY-SUBRC = 0.
+                                              SPFLI = CONNECTIONS.
+                                           ELSE.
+                                              WRITE: / 'ERRORE '''.
+                                              EXIT.
+                                           ENDIF.
+                                    CALL FUNCTION 'WRITE_FORM'
+                                         EXPORTING 
+                                           ELEMENT = 'BOOKING'
+                                           FUNCTION = 'SET'
+                                           TYPE = 'BODY'
+                                           WINDOWS = 'MAIN'
+                                         EXCEPTIONS 
+                                           OTHERS = 1.
+                                       IF SY-SUBRC <> 0.
+                                          WRITE: / 'ERRORE'.
+                                       ENDIF.
+                                   MOVE-CORRESPONDING SBOOKS TO SUMS.
+                                   COLLECT SUMS.
+                ENDLOOP.
+               
+                LOOP AT SUMS.
+                     MOVE-CORRESPONDING SUMS TO SBOOK.
+                     CALL FUNCITON 'WRITE_FORM'
+                           EXPORTING
+                              ELEMENT = 'SUM'
+                              FUNCTION = 'SET'
+                              TYPE = 'BODY'
+                              WINDOW = 'MAIN'
+                           EXCEPTIONS
+                             OTHERS = 1.
+                          IF SY-SUBRC NE 0.
+                             WRITE:/ 'IMPOSSIBILE SCRIVERE'.
+                             EXIT.
+                          ENDIF.
+                  ENDLOOP.
+                  CALL FUNCTION 'END_FORM'
+                       EXCEPTIONS 
+                           OTHERS = 1.
+                             IF SY-SUBRC NE 0.
+                                WRITE: / 'IMPOSSIBILE CHIUDERE IL FORM'.
+                             ENDIF.
+                ENDLOOP.
+                CALL FUNCTION 'CLOSE_FORM'
+                       EXCEPTIONS OTHERS = 1.
+                       IF SY-SUBRC NE 0.
+                          WRITGE: / 'IMPOSSIBILE CHIUDERE IL FORM'.
+                       ENDIF.
