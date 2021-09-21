@@ -1,0 +1,41 @@
+REPORT ZPGM1702.
+TABLES: EKKO, EKPO.
+DATA  : BEGIN OF TAB OCCURS 0,
+                 LIFNR LIKE EKKO-LIFNR,
+                 BEDAT LIKE EKKO-BEDAT,
+                 EBELN LIKE EKKO-EBELN,
+                 EBELP LIKE EKPO-EBELP,
+                 NETPR LIKE EKPO-NETPR,
+                 WAERS LIKE EKKO-WAERS,
+        END OF TAB.
+SELECTION-SCREEN: BEGIN OF BLOCK TESTO1 WITH FRAME TITLE TEXT-001.
+          SELECT-OPPTIONS: S_LIFNR FOR EKKO-LIFNR,
+                           S_BEDAT FOR EKKO-BEDAT.
+SELECTION-SCREEN: END OF BLOCK TESTO1.
+PARAMETERS: pscelta1 RADIOBUTTON GROUP G1 DEFAULT 'X',
+            p_out1 LIKE RLGRAP-FILENAME DEFAULT '\\SAPSERVER\SAPMNT\TRANS'.
+            pscelta2 RADIOBUTTON GROUP G1 ,
+            p_out2 LIKE RLGRAP-FILENAME DEFAULT 'c:\Ordini.txt'.
+            
+            SELECT * FROM EKKO WHERE LIFNR IN S_LIFNR AND BEDAT IN S_BEDAT.
+               SELECT SINGLE * FROM EKPO WHERE EBELN = EKKO-EBELN
+                      MOVE-CORRESPONDING EKKO TO TAB.
+                      MOVE-CORRESPONDING EKPO TO TAB.
+                      APPEND TAB.
+               ENDSELECT.
+               
+               IF pscelta2 = 'X'
+                  CALL FUNCTION 'WS-DOWNLOAD'
+                       EXPORTING
+                            FILE NAME = 'C:\Ordini.txt'
+                            FILETYPE  = 'ASC'
+                       TABLES 
+                            DATA_TAB = TAB
+                       EXCEPTIONS
+                            FILE_OPEN_ERROR = 1
+                            FILE_WRITE_ERROR = 2
+                            INVALID_TYPE = 3
+                            OTHERS = 9.
+               ENDIF.
+             ENDSELECT.
+             
