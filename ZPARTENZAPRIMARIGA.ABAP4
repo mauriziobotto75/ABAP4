@@ -1,0 +1,23 @@
+REPORT ZPARTENZAPRIMARIGA.
+TABLES: LFC3.
+DATA: IT LIKE LFC3 OCCURS 1 WITH HEADER LINE.
+SELECT * UP TO 1 ROWS FROM LFC3 INTO TABLE IT.
+
+       LOOP AT IT.
+           WRITE: / 'PRIMA DI  "AT FIRST ":  ',
+           WRITE: /  IT-LIFNR, IT-BUKRS, IT-GJAHR, IT-SHBKZ, IT-SALDU, IT-SOLLL.
+           
+           AT FIRST.
+              WRITE: / 'DENTRO "AT FIRST ": ',
+              WRITE: / IT-LIFNR, IT-BUKRS, IT-GJHAR, IT-SHBKZ, IT-SALDU, IT-SOLLL.
+              IT-LIFNR = 'XXXXX'.
+           ENDAT.
+           
+           AT LAST.
+              WRITE: /'DENTRO  " AT LAST: ",
+                     / IT-LIFNR, IT-BUKRS, IT-GJAHR, IT-SHBKZ, IT-SALDU, IT-SOLLL.
+              IT-LIFNR = 'YYYY'.
+           ENDAT.
+              WRITE: /'DOPO   "AT LAST:   ",
+                     / IT-LIFNR, IT-BUKRS, IT-GJHAR, IT-SHBKZ, IT-SALDU, IT-SOLLL.
+        ENDLOOP.
