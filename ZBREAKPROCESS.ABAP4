@@ -1,0 +1,25 @@
+REPORT ZBREAKPROCESS.
+TABLES: LFC3.
+DATA:   IT LIKE LFC3 OCCURS 0 WITH HEADER LINE.
+
+SELECT * FROM LFC3 INTO TABLE IT WHERE SHBKZ = 'Z'.
+      LOOP AT IT.
+           AT FIRST.
+              WRITE: / 'VENDITORE ', 12 'SOC.',
+                                     17 'ANNO',
+                                     22 'SALDO'.
+              ULINE.
+           ENDAT.
+           WRITE: / IT-LIFNR,
+                  12 IT-BUKRS,
+                  17 IT-GJAHR,
+                  22 IT-SALPV.
+           AT LAST.
+              WRITE: / '........',
+                     12  '.......',
+                     17  '.......',
+                     22  '............'.
+           ENDAT.
+      ENDLOOP.
+      
+      FREE IT.
