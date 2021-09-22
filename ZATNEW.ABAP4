@@ -1,0 +1,26 @@
+REPORT ZATNEW.
+DATA: BEGIN OF IT OCCURS 4,
+               F1,
+               F2,
+      END OF IT.
+      
+IT = '1A'.
+APPEND IT.
+IT = '3A'.
+APPEND IT.
+IT = '1B'.
+APPEND IT.
+IT = '2B'.
+APPEND IT.
+
+SORT IT BY F1.
+     LOOP AT IT.
+          AT NEW F1.
+             WRITE: / ' INIZIO DI  ', IT-F1.
+          ENDAT.
+          WRITE: / 4 IT-F1.
+          AT END OF F1.
+             WRITE: / ' FINE DI:    ', IT-F1.
+          ENDAT.
+     ENDLOOP.
+     
