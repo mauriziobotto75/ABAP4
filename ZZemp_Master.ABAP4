@@ -1,0 +1,1248 @@
+REPORT ZZEMP_MASTER.
+
+*TABLES : ZZEMP_MASTER.
+
+INCLUDE : FZZEMP_MASTERCDT.
+
+TYPES :
+        BEGIN OF TP_DESIG,
+          DESIG TYPE ZZEMP_MASTER-DESIGNATION,
+        END OF TP_DESIG.
+
+data : GT_DESIG   TYPE STANDARD TABLE OF TP_DESIG,
+       GS_DESIG   TYPE TP_DESIG.
+
+TYPES : BEGIN OF TP_FAMILY.
+        INCLUDE STRUCTURE ZZEMP_FAMILY.
+TYPES : MARK,
+        END OF TP_FAMILY.
+
+TYPES : BEGIN OF TP_EXP.
+        INCLUDE STRUCTURE ZZEMP_EXP.
+TYPES : MARK,
+        END OF TP_EXP.
+
+
+data : gt_family type STANDARD TABLE OF tp_family,
+       gs_family type tp_family,
+       gs_zzemp_family type ZZEMP_FAMILY,
+       gt_exp type STANDARD TABLE OF tp_exp,
+       gs_exp type tp_exp,
+       gs_zzemp_exp type ZZEMP_exp.
+
+data : gv_sno type sno.
+
+
+
+data : gs_emp_master type ZZEMP_MASTER.
+data : gs_emp_master_o type ZZEMP_MASTER.
+data : gv_flag type flag.
+
+
+DATA : R_M,
+       R_F,
+       R_U.
+
+DATA:  GV_ID     TYPE VRM_ID,
+       GT_VALUES TYPE VRM_VALUES,
+       GS_VALUES LIKE LINE OF GT_VALUES.
+DATA : GV_INIT.
+
+
+data : gv_len type I,
+       gv_ans.
+
+data : gt_state_city type STANDARD TABLE OF zstate_city,
+       gs_state_city type zstate_city.
+
+
+DATA : GARG LIKE  SEQG3-GARG,
+       ENQ  LIKE STANDARD TABLE OF SEQG3 WITH HEADER LINE,
+       GV_MSG TYPE STRING.
+
+
+DATA:  GT_ICDTXT TYPE STANDARD TABLE OF CDTXT,
+       GV_OBJECTID TYPE  CDHDR-OBJECTID.
+
+data : gv_cursor type char50.
+
+DATA : gt_text  TYPE TABLE OF tline INITIAL SIZE 1,
+       gs_text  TYPE tline.
+
+
+
+*&SPWIZARD: DECLARATION OF TABLECONTROL 'TC2' ITSELF
+CONTROLS: TC2 TYPE TABLEVIEW USING SCREEN 0200.
+
+*&SPWIZARD: LINES OF TABLECONTROL 'TC2'
+DATA:     G_TC2_LINES  LIKE SY-LOOPC.
+
+
+*&SPWIZARD: DECLARATION OF TABLECONTROL 'TC1' ITSELF
+CONTROLS: TC1 TYPE TABLEVIEW USING SCREEN 0200.
+
+*&SPWIZARD: LINES OF TABLECONTROL 'TC1'
+DATA:     G_TC1_LINES  LIKE SY-LOOPC.
+
+DATA:     OK_CODE LIKE SY-UCOMM.
+
+SELECTION-SCREEN begin of BLOCK b1 WITH FRAME TITLE text-001.
+  PARAMETERS : P_EMPID TYPE ZZEMP_MASTER-EMPID OBLIGATORY.
+SELECTION-SCREEN end of BLOCK b1.
+
+
+START-OF-SELECTION.
+
+   CALL FUNCTION 'ENQUEUE_EZZEMP_MASTER'
+    EXPORTING
+      MODE_ZZEMP_MASTER       = 'E'
+      MANDT                   = SY-MANDT
+      EMPID                   = P_EMPID
+*      X_EMPID                 = ' '
+*      _SCOPE                  = '2'
+*      _WAIT                   = ' '
+*      _COLLECT                = ' '
+    EXCEPTIONS
+      FOREIGN_LOCK            = 1
+      SYSTEM_FAILURE          = 2
+      OTHERS                  = 3
+             .
+*   IF SY-SUBRC <> 0.
+   IF SY-SUBRC = 1.
+
+       CONCATENATE SY-MANDT P_EMPID INTO GARG.
+
+       CALL FUNCTION 'ENQUEUE_READ'
+        EXPORTING
+          GCLIENT                     = SY-MANDT
+          GNAME                       = 'ZZEMP_MASTER'
+          GARG                        = GARG
+*          GUNAME                      = SY-UNAME
+*          LOCAL                       = ' '
+*          FAST                        = ' '
+*          GARGNOWC                    = ' '
+*        IMPORTING
+*          NUMBER                      =
+*          SUBRC                       =
+         TABLES
+           ENQ                         = ENQ
+        EXCEPTIONS
+          COMMUNICATION_FAILURE       = 1
+          SYSTEM_FAILURE              = 2
+          OTHERS                      = 3
+                 .
+       IF SY-SUBRC <> 0.
+* Implement suitable error handling here
+       ENDIF.
+
+      READ TABLE ENQ INDEX 1.
+      CONCATENATE 'The object is lock by user' enq-GUNAME into gv_msg SEPARATED BY space.
+
+*      message gv_msg type 'S'.
+      message E002(ZEMP_MASTER) with enq-GUNAME.
+*    MESSAGE 'The object is locked by other user.' TYPE 'S'.
+      SET SCREEN 0.
+
+
+*     MESSAGE 'Object is lock by other user' TYPE 'S'.
+*     set SCREEN 0.
+* Implement suitable error handling here
+
+
+
+
+  ELSE.
+
+   SELECT SINGLE * FROM ZZEMP_MASTER INTO CORRESPONDING FIELDS OF gs_emp_master
+   WHERE EMPID =  P_EMPID.
+
+      GS_EMP_MASTER-EMPID  = P_EMPID.
+
+   IF GS_EMP_MASTER-GENDER = 'M'.
+      R_M = 'X'.
+   ELSEIF GS_EMP_MASTER-GENDER = 'F'.
+      R_F = 'X'.
+   ELSE.
+
+   ENDIF.
+
+"select family memebrs
+  select * from zzemp_family into CORRESPONDING FIELDS OF TABLE gt_family
+  WHERE EMPID = P_EMPID.
+
+  select * from zzemp_exp into CORRESPONDING FIELDS OF TABLE gt_exp
+  WHERE EMPID = P_EMPID.
+
+      call  SCREEN 0100.
+
+CALL FUNCTION 'DEQUEUE_EZZEMP_MASTER'
+ EXPORTING
+   MODE_ZZEMP_MASTER       = 'E'
+   MANDT                   = SY-MANDT
+   EMPID                   = P_EMPID
+*   X_EMPID                 = ' '
+*   _SCOPE                  = '3'
+*   _SYNCHRON               = ' '
+*   _COLLECT                = ' '
+          .
+
+
+
+   ENDIF.
+
+END-OF-SELECTION.
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0100  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE STATUS_0100 OUTPUT.
+  SET PF-STATUS 'PF1'.
+  SET TITLEBAR 'T1'.
+
+  IF GV_INIT IS INITIAL.
+     PERFORM SET_LIST_BOX.
+     GV_INIT = 'X'.
+  ENDIF.
+
+
+  IF GS_EMP_MASTER-MARITAL_STATUS NE 'M'.
+
+    LOOP AT SCREEN.
+    IF SCREEN-GROUP1 = 'HD1'.
+       SCREEN-ACTIVE  = 0.
+       MODIFY SCREEN.
+    ENDIF.
+
+    ENDLOOP.
+
+    CLEAR : GS_EMP_MASTER-SPOUSE.
+  ENDIF.
+
+   LOOP AT SCREEN.
+   IF SCREEN-GROUP2 = 'HD2'.
+      SCREEN-INPUT = 0.
+      MODIFY SCREEN.
+   ENDIF.
+   ENDLOOP.
+
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  EXT  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE EXT INPUT.
+       SET SCREEN 0.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE USER_COMMAND_0100 INPUT.
+
+  CASE SY-UCOMM.
+
+  WHEN 'BACK' OR 'EXIT' OR 'CANCE'.
+    SET SCREEN 0.
+  WHEN 'SAVE'.
+     perform save_confirmation.
+
+    if gv_ans = '1'.
+    PERFORM SAVE.
+    endif.
+  WHEN 'STATE'.
+    perform set_state_city.
+  WHEN 'GENDER'.
+
+   IF R_M IS NOT INITIAL.
+      GS_EMP_MASTER-TITLE = 'MR.'.
+   ELSEIF R_F IS NOT INITIAL.
+      GS_EMP_MASTER-TITLE = 'MRS.'.
+   ENDIF.
+
+  WHEN 'PICK'.
+    get CURSOR FIELD GV_CURSOR.
+
+    IF GV_CURSOR = 'GS_EMP_MASTER-EMPID'.
+       CALL TRANSACTION 'XK03'.
+    ENDIF.
+
+  WHEN 'FAMILY'.
+      CALL SCREEN 0200.
+
+  ENDCASE.
+
+   CLEAR : SY-UCOMM.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Form  SAVE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM SAVE.
+
+   IF GS_EMP_MASTER-CREATEDBY IS INITIAL.
+      GS_EMP_MASTER-CREATEDBY   = SY-UNAME.
+      GS_EMP_MASTER-CREATEDON   = SY-DATUM.
+      GS_EMP_MASTER-TIME        = SY-UZEIT.
+   ENDIF.
+
+   IF R_M IS NOT INITIAL.
+      GS_EMP_MASTER-GENDER = 'M'.
+   ELSEIF R_F IS NOT INITIAL.
+      GS_EMP_MASTER-GENDER = 'F'.
+   ELSE.
+       clear : GS_EMP_MASTER-GENDER.
+   ENDIF.
+
+    PERFORM CHANGE_LOG.
+"header table
+    MODIFY ZZEMP_MASTER FROM GS_EMP_MASTER.
+
+"family member
+    delete from ZZEMP_FAMILY WHERE empid = P_EMPID.
+    loop at gt_family into gs_family where RELATIONSHIP is NOT INITIAL.
+    clear : gs_zzemp_family.
+
+    MOVE-CORRESPONDING GS_FAMILY to gs_zzemp_family.
+    gs_zzemp_family-EMPID  = P_EMPID.
+
+"age
+   if gs_zzemp_family-dob is NOT INITIAL.
+
+CALL FUNCTION 'HRCM_TIME_PERIOD_CALCULATE'
+  EXPORTING
+    BEGDA               = gs_zzemp_family-dob
+    ENDDA               = sy-datum
+ IMPORTING
+   NOYRS               = gs_zzemp_family-age
+*   NOMNS               =
+*   NODYS               =
+ EXCEPTIONS
+   INVALID_DATES       = 1
+   OVERFLOW            = 2
+   OTHERS              = 3
+          .
+IF SY-SUBRC <> 0.
+* Implement suitable error handling here
+ENDIF.
+
+
+   endif.
+
+    modify ZZEMP_FAMILY from gs_zzemp_family.
+
+    clear : gs_family.
+    endloop.
+
+"for work experiance
+    delete from ZZEMP_EXP WHERE empid = P_EMPID.
+
+    clear : gv_sno.
+    loop at gt_exp into gs_exp WHERE COMPANY is NOT INITIAL.
+    clear : GS_ZZEMP_EXP.
+    MOVE-CORRESPONDING gs_exp to GS_ZZEMP_EXP.
+
+    gv_sno = gv_sno + 1.
+    gs_zzemp_exp-EMPID = P_EMPID.
+    GS_ZZEMP_EXP-sno   = gv_sno.
+    MODIFY ZZEMP_EXP from GS_ZZEMP_EXP.
+
+
+    clear : gs_exp.
+    endloop.
+
+
+
+     MESSAGE 'Data saved successfully' TYPE 'S'.
+     SET SCREEN 0.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  SET_LIST_BOX
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM SET_LIST_BOX .
+
+
+  CLEAR : GT_VALUES[], GS_VALUES.
+
+  gs_values-KEY  = 'MR.'.
+  append gs_values to gt_values.
+
+  gs_values-KEY  = 'Mrs.'.
+  append gs_values to gt_values.
+
+  SORT GT_VALUES BY KEY.
+  DELETE ADJACENT DUPLICATES FROM GT_VALUES COMPARING KEY.
+
+  GV_ID = 'GS_EMP_MASTER-TITLE'.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      ID     = GV_ID
+      VALUES = GT_VALUES.
+
+  CLEAR : GS_VALUES, GT_VALUES[].
+
+
+   CLEAR : GT_STATE_CITY.
+*   select DISTINCT ( state )from zstate_city into CORRESPONDING FIELDS OF TABLE GT_STATE_CITY.
+   select * from zstate_city into CORRESPONDING FIELDS OF TABLE GT_STATE_CITY.
+     sort GT_STATE_CITY by state.
+     DELETE ADJACENT DUPLICATES FROM GT_STATE_CITY COMPARING STATE.
+
+     loop at GT_STATE_CITY into GS_STATE_CITY.
+      gs_values-KEY  = GS_STATE_CITY-STATE..
+      append gs_values to gt_values.
+     clear : GS_STATE_CITY.
+     endloop.
+
+  SORT GT_VALUES BY KEY.
+  DELETE ADJACENT DUPLICATES FROM GT_VALUES COMPARING KEY.
+
+  GV_ID = 'GS_EMP_MASTER-STATE'.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      ID     = GV_ID
+      VALUES = GT_VALUES.
+
+  CLEAR : GS_VALUES, GT_VALUES[].
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  SET_STATE_CITY
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM SET_STATE_CITY .
+
+    select * from zstate_city into CORRESPONDING FIELDS OF TABLE GT_STATE_CITY
+    WHERE state = gs_emp_master-STATE.
+
+
+  CLEAR : GT_VALUES[], GS_VALUES.
+
+  loop at GT_STATE_CITY into gs_state_city.
+   gs_values-KEY  = gs_state_city-city..
+  append gs_values to gt_values.
+  clear : gs_values.
+  endloop.
+
+  SORT GT_VALUES BY KEY.
+  DELETE ADJACENT DUPLICATES FROM GT_VALUES COMPARING KEY.
+
+  GV_ID = 'GS_EMP_MASTER-CITY'.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      ID     = GV_ID
+      VALUES = GT_VALUES.
+
+  CLEAR : GS_VALUES, GT_VALUES[].
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Module  FIELD_VALIDATION  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE FIELD_VALIDATION INPUT.
+
+  CASE SY-UCOMM.
+
+  WHEN 'SAVE'.
+
+  IF GS_EMP_MASTER-PAN IS INITIAL.
+*     MESSAGE 'Enter the pan card No.' TYPE 'E'.
+     MESSAGE E000(ZEMP_MASTER).
+  else.
+      GV_LEN = STRLEN( GS_EMP_MASTER-PAN ).
+
+    IF GV_LEN NE 10.
+      MESSAGE 'PAN card should be of length 10' TYPE 'E'.
+    ENDIF.
+
+  endif.
+
+   IF GS_EMP_MASTER-MARITAL_STATUS = 'M' and
+      GS_EMP_MASTER-SPOUSE IS INITIAL.
+
+      MESSAGE 'Spouse name is mandatory for married employee' TYPE 'E'.
+   ENDIF.
+
+   if gs_emp_master-doj is INITIAL.
+      message 'Please enter the date of joining' TYPE 'E'.
+   endif.
+
+
+  ENDCASE.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Form  SAVE_CONFIRMATION
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM SAVE_CONFIRMATION .
+
+CALL FUNCTION 'POPUP_TO_CONFIRM'
+  EXPORTING
+   TITLEBAR                    = 'Confirmation'
+*   DIAGNOSE_OBJECT             = ' '
+    TEXT_QUESTION               = 'Do you want to save?'
+   TEXT_BUTTON_1               = 'Yes'
+*   ICON_BUTTON_1               = ' '
+   TEXT_BUTTON_2               = 'No'
+*   ICON_BUTTON_2               = ' '
+*   DEFAULT_BUTTON              = '1'
+   DISPLAY_CANCEL_BUTTON       = 'X'
+*   USERDEFINED_F1_HELP         = ' '
+*   START_COLUMN                = 25
+*   START_ROW                   = 6
+*   POPUP_TYPE                  =
+*   IV_QUICKINFO_BUTTON_1       = ' '
+*   IV_QUICKINFO_BUTTON_2       = ' '
+ IMPORTING
+   ANSWER                      = gv_ans
+* TABLES
+*   PARAMETER                   =
+ EXCEPTIONS
+   TEXT_NOT_FOUND              = 1
+   OTHERS                      = 2
+          .
+IF SY-SUBRC <> 0.
+* Implement suitable error handling here
+ENDIF.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  CHANGE_LOG
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM CHANGE_LOG .
+
+  select SINGLE * from zzemp_master into CORRESPONDING FIELDS OF GS_EMP_MASTER_O
+  WHERE EMPID = P_EMPID.
+
+  GV_OBJECTID = P_EMPID.
+  CONDENSE GV_OBJECTID.
+
+
+CALL FUNCTION 'ZZEMP_MASTER_WRITE_DOCUMENT'
+  EXPORTING
+    OBJECTID                      = GV_OBJECTID
+    TCODE                         = sy-tcode
+    UTIME                         = sy-uzeit
+    UDATE                         = sy-datum
+    USERNAME                      = sy-uname
+*   PLANNED_CHANGE_NUMBER         = ' '
+   OBJECT_CHANGE_INDICATOR       = 'U'
+*   PLANNED_OR_REAL_CHANGES       = ' '
+*   NO_CHANGE_POINTERS            = ' '
+*   UPD_ICDTXT_ZZEMP_MASTER       = ' '
+   N_ZZEMP_MASTER                = gs_emp_master
+   O_ZZEMP_MASTER                = gs_emp_master_o
+   UPD_ZZEMP_MASTER              = 'U'
+  TABLES
+    ICDTXT_ZZEMP_MASTER           = GT_ICDTXT
+          .
+
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Module  GET_F1_HELP  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE GET_F1_HELP INPUT.
+
+  REFRESH : gt_text[].
+  CLEAR : gs_text.
+
+  gs_text-tdformat = 'U1'.
+  gs_text-tdline = 'F1 HELP Demo'.
+  APPEND gs_text TO gt_text.
+  CLEAR gs_text.
+
+  gs_text-tdformat = '*'.
+  gs_text-tdline = 'Select the check box if employee is a Manager'.
+  APPEND gs_text TO gt_text.
+  CLEAR gs_text.
+
+  gs_text-tdformat = '*'.
+  gs_text-tdline = 'If employee is not manager dont select the check box'.
+  APPEND gs_text TO gt_text.
+  CLEAR gs_text.
+
+CALL FUNCTION 'COPO_POPUP_TO_DISPLAY_TEXTLIST'
+  EXPORTING
+*   TASK             = 'DISPLAY'
+    TITEL            =  'F1 HELP FOR Manager'
+* IMPORTING
+*   FUNCTION         =
+  TABLES
+    TEXT_TABLE       = gt_text.
+
+*
+*  CALL FUNCTION 'COPO_POPUP_TO_DISPLAY_TEXTLIST'
+*    EXPORTING
+*      titel      = 'F1 HELP'
+*    TABLES
+*      text_table = gt_text.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  GET_DESIG  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+
+*MODULE GET_DESIG INPUT.
+*
+*   clear : gt_desig[], gs_desig.
+*
+*   gs_desig-DESIG = 'Jr. Consulatnt'.
+*   append gs_desig to gt_desig.
+*   gs_desig-desig = 'Sr. Consultant'.
+*   append gs_desig to gt_desig.
+*
+*  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+*    EXPORTING
+*      retfield               = 'DESIG' "internal table field
+*      dynpprog               = sy-cprog "program name
+*      dynpnr                 = sy-dynnr "screen number
+*      dynprofield            = 'GS_EMP_MASTER-DESIGNATION' "screen field name
+*      value_org              = 'S'
+*    TABLES
+*      value_tab              = gt_desig "internal table
+*    EXCEPTIONS
+*      PARAMETER_ERROR        = 1
+*      NO_VALUES_FOUND        = 2
+*      OTHERS                 = 3.
+*
+*  IF sy-subrc  <> 0.
+*    MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*            WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+*  ENDIF.
+*
+*ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  GET_DESIG  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE GET_DESIG INPUT.
+
+
+   clear : gt_desig[], gs_desig.
+
+   gs_desig-DESIG = 'Jr. Consulatnt'.
+   append gs_desig to gt_desig.
+   gs_desig-desig = 'Sr. Consultant'.
+   append gs_desig to gt_desig.
+   gs_desig-desig = 'Team Lead'.
+   append gs_desig to gt_desig.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield               = 'DESIG' "internal table field
+      dynpprog               = sy-cprog "program name
+      dynpnr                 = sy-dynnr "screen number
+      dynprofield            = 'GS_EMP_MASTER-DESIGNATION' "screen field name
+      value_org              = 'S'
+    TABLES
+      value_tab              = gt_desig "internal table
+    EXCEPTIONS
+      PARAMETER_ERROR        = 1
+      NO_VALUES_FOUND        = 2
+      OTHERS                 = 3.
+
+  IF sy-subrc  <> 0.
+    MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+            WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ENDIF.
+
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0200  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE STATUS_0200 OUTPUT.
+  SET PF-STATUS 'PF2'.
+  SET TITLEBAR 'T2'.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0200  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE USER_COMMAND_0200 INPUT.
+
+    case sy-ucomm.
+
+    when 'EXIT' or 'CANCEL ' or 'CLOSE' OR 'BACK'.
+      set SCREEN 0.
+
+    ENDCASE.
+
+
+ENDMODULE.
+
+
+
+*&SPWIZARD: OUTPUT MODULE FOR TC 'TC1'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: UPDATE LINES FOR EQUIVALENT SCROLLBAR
+MODULE TC1_CHANGE_TC_ATTR OUTPUT.
+  DESCRIBE TABLE GT_FAMILY LINES TC1-lines.
+
+  IF GT_FAMILY[] IS INITIAL.
+     CLEAR : GS_FAMILY.
+
+   DO 4 TIMES.
+      APPEND GS_FAMILY TO GT_FAMILY.
+   ENDDO.
+
+
+  ENDIF.
+
+
+ENDMODULE.
+
+*&SPWIZARD: OUTPUT MODULE FOR TC 'TC1'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: GET LINES OF TABLECONTROL
+MODULE TC1_GET_LINES OUTPUT.
+  G_TC1_LINES = SY-LOOPC.
+
+
+    IF GS_FAMILY-RELATIONSHIP = 'FATHER' OR GS_FAMILY-RELATIONSHIP = 'HUSBAND'.
+
+    LOOP AT SCREEN.
+
+    IF SCREEN-NAME = 'GS_FAMILY-GENDER'.
+       GS_FAMILY-GENDER = 'M'.
+       SCREEN-INPUT = '0'.
+       MODIFY SCREEN.
+    ENDIF.
+
+    ENDLOOP.
+
+    ELSEIF GS_FAMILY-RELATIONSHIP = 'MOTHER' OR GS_FAMILY-RELATIONSHIP = 'WIFE'.
+
+    LOOP AT SCREEN.
+
+    IF SCREEN-NAME = 'GS_FAMILY-GENDER'.
+       GS_FAMILY-GENDER = 'F'.
+       SCREEN-INPUT = '0'.
+       MODIFY SCREEN.
+    ENDIF.
+
+    ENDLOOP.
+
+    ENDIF.
+
+
+ENDMODULE.
+
+*&SPWIZARD: INPUT MODULE FOR TC 'TC1'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: MODIFY TABLE
+MODULE TC1_MODIFY INPUT.
+  MODIFY GT_FAMILY
+    FROM GS_FAMILY
+    INDEX TC1-CURRENT_LINE.
+
+
+
+ENDMODULE.
+
+*&SPWIZARD: INPUT MODUL FOR TC 'TC1'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: MARK TABLE
+MODULE TC1_MARK INPUT.
+  DATA: g_TC1_wa2 like line of GT_FAMILY.
+    if TC1-line_sel_mode = 1
+    and GS_FAMILY-MARK = 'X'.
+     loop at GT_FAMILY into g_TC1_wa2
+       where MARK = 'X'.
+       g_TC1_wa2-MARK = ''.
+       modify GT_FAMILY
+         from g_TC1_wa2
+         transporting MARK.
+     endloop.
+  endif.
+  MODIFY GT_FAMILY
+    FROM GS_FAMILY
+    INDEX TC1-CURRENT_LINE
+    TRANSPORTING MARK.
+ENDMODULE.
+
+*&SPWIZARD: INPUT MODULE FOR TC 'TC1'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: PROCESS USER COMMAND
+MODULE TC1_USER_COMMAND INPUT.
+  OK_CODE = SY-UCOMM.
+  PERFORM USER_OK_TC USING    'TC1'
+                              'GT_FAMILY'
+                              'MARK'
+                     CHANGING OK_CODE.
+  SY-UCOMM = OK_CODE.
+ENDMODULE.
+
+*----------------------------------------------------------------------*
+*   INCLUDE TABLECONTROL_FORMS                                         *
+*----------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*&      Form  USER_OK_TC                                               *
+*&---------------------------------------------------------------------*
+ FORM USER_OK_TC USING    P_TC_NAME TYPE DYNFNAM
+                          P_TABLE_NAME
+                          P_MARK_NAME
+                 CHANGING P_OK      LIKE SY-UCOMM.
+
+*&SPWIZARD: BEGIN OF LOCAL DATA----------------------------------------*
+   DATA: L_OK              TYPE SY-UCOMM,
+         L_OFFSET          TYPE I.
+*&SPWIZARD: END OF LOCAL DATA------------------------------------------*
+
+*&SPWIZARD: Table control specific operations                          *
+*&SPWIZARD: evaluate TC name and operations                            *
+   SEARCH P_OK FOR P_TC_NAME.
+   IF SY-SUBRC <> 0.
+     EXIT.
+   ENDIF.
+   L_OFFSET = STRLEN( P_TC_NAME ) + 1.
+   L_OK = P_OK+L_OFFSET.
+*&SPWIZARD: execute general and TC specific operations                 *
+   CASE L_OK.
+     WHEN 'INSR'.                      "insert row
+       PERFORM FCODE_INSERT_ROW USING    P_TC_NAME
+                                         P_TABLE_NAME.
+       CLEAR P_OK.
+
+     WHEN 'DELE'.                      "delete row
+       PERFORM FCODE_DELETE_ROW USING    P_TC_NAME
+                                         P_TABLE_NAME
+                                         P_MARK_NAME.
+       CLEAR P_OK.
+
+     WHEN 'P--' OR                     "top of list
+          'P-'  OR                     "previous page
+          'P+'  OR                     "next page
+          'P++'.                       "bottom of list
+       PERFORM COMPUTE_SCROLLING_IN_TC USING P_TC_NAME
+                                             L_OK.
+       CLEAR P_OK.
+*     WHEN 'L--'.                       "total left
+*       PERFORM FCODE_TOTAL_LEFT USING P_TC_NAME.
+*
+*     WHEN 'L-'.                        "column left
+*       PERFORM FCODE_COLUMN_LEFT USING P_TC_NAME.
+*
+*     WHEN 'R+'.                        "column right
+*       PERFORM FCODE_COLUMN_RIGHT USING P_TC_NAME.
+*
+*     WHEN 'R++'.                       "total right
+*       PERFORM FCODE_TOTAL_RIGHT USING P_TC_NAME.
+*
+     WHEN 'MARK'.                      "mark all filled lines
+       PERFORM FCODE_TC_MARK_LINES USING P_TC_NAME
+                                         P_TABLE_NAME
+                                         P_MARK_NAME   .
+       CLEAR P_OK.
+
+     WHEN 'DMRK'.                      "demark all filled lines
+       PERFORM FCODE_TC_DEMARK_LINES USING P_TC_NAME
+                                           P_TABLE_NAME
+                                           P_MARK_NAME .
+       CLEAR P_OK.
+
+*     WHEN 'SASCEND'   OR
+*          'SDESCEND'.                  "sort column
+*       PERFORM FCODE_SORT_TC USING P_TC_NAME
+*                                   l_ok.
+
+   ENDCASE.
+
+ ENDFORM.                              " USER_OK_TC
+
+*&---------------------------------------------------------------------*
+*&      Form  FCODE_INSERT_ROW                                         *
+*&---------------------------------------------------------------------*
+ FORM fcode_insert_row
+               USING    P_TC_NAME           TYPE DYNFNAM
+                        P_TABLE_NAME             .
+
+*&SPWIZARD: BEGIN OF LOCAL DATA----------------------------------------*
+   DATA L_LINES_NAME       LIKE FELD-NAME.
+   DATA L_SELLINE          LIKE SY-STEPL.
+   DATA L_LASTLINE         TYPE I.
+   DATA L_LINE             TYPE I.
+   DATA L_TABLE_NAME       LIKE FELD-NAME.
+   FIELD-SYMBOLS <TC>                 TYPE CXTAB_CONTROL.
+   FIELD-SYMBOLS <TABLE>              TYPE STANDARD TABLE.
+   FIELD-SYMBOLS <LINES>              TYPE I.
+*&SPWIZARD: END OF LOCAL DATA------------------------------------------*
+
+   ASSIGN (P_TC_NAME) TO <TC>.
+
+*&SPWIZARD: get the table, which belongs to the tc                     *
+   CONCATENATE P_TABLE_NAME '[]' INTO L_TABLE_NAME. "table body
+   ASSIGN (L_TABLE_NAME) TO <TABLE>.                "not headerline
+
+*&SPWIZARD: get looplines of TableControl                              *
+   CONCATENATE 'G_' P_TC_NAME '_LINES' INTO L_LINES_NAME.
+   ASSIGN (L_LINES_NAME) TO <LINES>.
+
+*&SPWIZARD: get current line                                           *
+   GET CURSOR LINE L_SELLINE.
+   IF SY-SUBRC <> 0.                   " append line to table
+     L_SELLINE = <TC>-LINES + 1.
+*&SPWIZARD: set top line                                               *
+     IF L_SELLINE > <LINES>.
+       <TC>-TOP_LINE = L_SELLINE - <LINES> + 1 .
+     ELSE.
+       <TC>-TOP_LINE = 1.
+     ENDIF.
+   ELSE.                               " insert line into table
+     L_SELLINE = <TC>-TOP_LINE + L_SELLINE - 1.
+     L_LASTLINE = <TC>-TOP_LINE + <LINES> - 1.
+   ENDIF.
+*&SPWIZARD: set new cursor line                                        *
+   L_LINE = L_SELLINE - <TC>-TOP_LINE + 1.
+
+*&SPWIZARD: insert initial line                                        *
+   INSERT INITIAL LINE INTO <TABLE> INDEX L_SELLINE.
+   <TC>-LINES = <TC>-LINES + 1.
+*&SPWIZARD: set cursor                                                 *
+   SET CURSOR LINE L_LINE.
+
+ ENDFORM.                              " FCODE_INSERT_ROW
+
+*&---------------------------------------------------------------------*
+*&      Form  FCODE_DELETE_ROW                                         *
+*&---------------------------------------------------------------------*
+ FORM fcode_delete_row
+               USING    P_TC_NAME           TYPE DYNFNAM
+                        P_TABLE_NAME
+                        P_MARK_NAME   .
+
+*&SPWIZARD: BEGIN OF LOCAL DATA----------------------------------------*
+   DATA L_TABLE_NAME       LIKE FELD-NAME.
+
+   FIELD-SYMBOLS <TC>         TYPE cxtab_control.
+   FIELD-SYMBOLS <TABLE>      TYPE STANDARD TABLE.
+   FIELD-SYMBOLS <WA>.
+   FIELD-SYMBOLS <MARK_FIELD>.
+*&SPWIZARD: END OF LOCAL DATA------------------------------------------*
+
+   ASSIGN (P_TC_NAME) TO <TC>.
+
+*&SPWIZARD: get the table, which belongs to the tc                     *
+   CONCATENATE P_TABLE_NAME '[]' INTO L_TABLE_NAME. "table body
+   ASSIGN (L_TABLE_NAME) TO <TABLE>.                "not headerline
+
+*&SPWIZARD: delete marked lines                                        *
+   DESCRIBE TABLE <TABLE> LINES <TC>-LINES.
+
+   LOOP AT <TABLE> ASSIGNING <WA>.
+
+*&SPWIZARD: access to the component 'FLAG' of the table header         *
+     ASSIGN COMPONENT P_MARK_NAME OF STRUCTURE <WA> TO <MARK_FIELD>.
+
+     IF <MARK_FIELD> = 'X'.
+       DELETE <TABLE> INDEX SYST-TABIX.
+       IF SY-SUBRC = 0.
+         <TC>-LINES = <TC>-LINES - 1.
+       ENDIF.
+     ENDIF.
+   ENDLOOP.
+
+ ENDFORM.                              " FCODE_DELETE_ROW
+
+*&---------------------------------------------------------------------*
+*&      Form  COMPUTE_SCROLLING_IN_TC
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_TC_NAME  name of tablecontrol
+*      -->P_OK       ok code
+*----------------------------------------------------------------------*
+ FORM COMPUTE_SCROLLING_IN_TC USING    P_TC_NAME
+                                       P_OK.
+*&SPWIZARD: BEGIN OF LOCAL DATA----------------------------------------*
+   DATA L_TC_NEW_TOP_LINE     TYPE I.
+   DATA L_TC_NAME             LIKE FELD-NAME.
+   DATA L_TC_LINES_NAME       LIKE FELD-NAME.
+   DATA L_TC_FIELD_NAME       LIKE FELD-NAME.
+
+   FIELD-SYMBOLS <TC>         TYPE cxtab_control.
+   FIELD-SYMBOLS <LINES>      TYPE I.
+*&SPWIZARD: END OF LOCAL DATA------------------------------------------*
+
+   ASSIGN (P_TC_NAME) TO <TC>.
+*&SPWIZARD: get looplines of TableControl                              *
+   CONCATENATE 'G_' P_TC_NAME '_LINES' INTO L_TC_LINES_NAME.
+   ASSIGN (L_TC_LINES_NAME) TO <LINES>.
+
+
+*&SPWIZARD: is no line filled?                                         *
+   IF <TC>-LINES = 0.
+*&SPWIZARD: yes, ...                                                   *
+     L_TC_NEW_TOP_LINE = 1.
+   ELSE.
+*&SPWIZARD: no, ...                                                    *
+     CALL FUNCTION 'SCROLLING_IN_TABLE'
+          EXPORTING
+               ENTRY_ACT             = <TC>-TOP_LINE
+               ENTRY_FROM            = 1
+               ENTRY_TO              = <TC>-LINES
+               LAST_PAGE_FULL        = 'X'
+               LOOPS                 = <LINES>
+               OK_CODE               = P_OK
+               OVERLAPPING           = 'X'
+          IMPORTING
+               ENTRY_NEW             = L_TC_NEW_TOP_LINE
+          EXCEPTIONS
+*              NO_ENTRY_OR_PAGE_ACT  = 01
+*              NO_ENTRY_TO           = 02
+*              NO_OK_CODE_OR_PAGE_GO = 03
+               OTHERS                = 0.
+   ENDIF.
+
+*&SPWIZARD: get actual tc and column                                   *
+   GET CURSOR FIELD L_TC_FIELD_NAME
+              AREA  L_TC_NAME.
+
+   IF SYST-SUBRC = 0.
+     IF L_TC_NAME = P_TC_NAME.
+*&SPWIZARD: et actual column                                           *
+       SET CURSOR FIELD L_TC_FIELD_NAME LINE 1.
+     ENDIF.
+   ENDIF.
+
+*&SPWIZARD: set the new top line                                       *
+   <TC>-TOP_LINE = L_TC_NEW_TOP_LINE.
+
+
+ ENDFORM.                              " COMPUTE_SCROLLING_IN_TC
+
+*&---------------------------------------------------------------------*
+*&      Form  FCODE_TC_MARK_LINES
+*&---------------------------------------------------------------------*
+*       marks all TableControl lines
+*----------------------------------------------------------------------*
+*      -->P_TC_NAME  name of tablecontrol
+*----------------------------------------------------------------------*
+FORM FCODE_TC_MARK_LINES USING P_TC_NAME
+                               P_TABLE_NAME
+                               P_MARK_NAME.
+*&SPWIZARD: EGIN OF LOCAL DATA-----------------------------------------*
+  DATA L_TABLE_NAME       LIKE FELD-NAME.
+
+  FIELD-SYMBOLS <TC>         TYPE cxtab_control.
+  FIELD-SYMBOLS <TABLE>      TYPE STANDARD TABLE.
+  FIELD-SYMBOLS <WA>.
+  FIELD-SYMBOLS <MARK_FIELD>.
+*&SPWIZARD: END OF LOCAL DATA------------------------------------------*
+
+  ASSIGN (P_TC_NAME) TO <TC>.
+
+*&SPWIZARD: get the table, which belongs to the tc                     *
+   CONCATENATE P_TABLE_NAME '[]' INTO L_TABLE_NAME. "table body
+   ASSIGN (L_TABLE_NAME) TO <TABLE>.                "not headerline
+
+*&SPWIZARD: mark all filled lines                                      *
+  LOOP AT <TABLE> ASSIGNING <WA>.
+
+*&SPWIZARD: access to the component 'FLAG' of the table header         *
+     ASSIGN COMPONENT P_MARK_NAME OF STRUCTURE <WA> TO <MARK_FIELD>.
+
+     <MARK_FIELD> = 'X'.
+  ENDLOOP.
+ENDFORM.                                          "fcode_tc_mark_lines
+
+*&---------------------------------------------------------------------*
+*&      Form  FCODE_TC_DEMARK_LINES
+*&---------------------------------------------------------------------*
+*       demarks all TableControl lines
+*----------------------------------------------------------------------*
+*      -->P_TC_NAME  name of tablecontrol
+*----------------------------------------------------------------------*
+FORM FCODE_TC_DEMARK_LINES USING P_TC_NAME
+                                 P_TABLE_NAME
+                                 P_MARK_NAME .
+*&SPWIZARD: BEGIN OF LOCAL DATA----------------------------------------*
+  DATA L_TABLE_NAME       LIKE FELD-NAME.
+
+  FIELD-SYMBOLS <TC>         TYPE cxtab_control.
+  FIELD-SYMBOLS <TABLE>      TYPE STANDARD TABLE.
+  FIELD-SYMBOLS <WA>.
+  FIELD-SYMBOLS <MARK_FIELD>.
+*&SPWIZARD: END OF LOCAL DATA------------------------------------------*
+
+  ASSIGN (P_TC_NAME) TO <TC>.
+
+*&SPWIZARD: get the table, which belongs to the tc                     *
+   CONCATENATE P_TABLE_NAME '[]' INTO L_TABLE_NAME. "table body
+   ASSIGN (L_TABLE_NAME) TO <TABLE>.                "not headerline
+
+*&SPWIZARD: demark all filled lines                                    *
+  LOOP AT <TABLE> ASSIGNING <WA>.
+
+*&SPWIZARD: access to the component 'FLAG' of the table header         *
+     ASSIGN COMPONENT P_MARK_NAME OF STRUCTURE <WA> TO <MARK_FIELD>.
+
+     <MARK_FIELD> = SPACE.
+  ENDLOOP.
+ENDFORM.                                          "fcode_tc_mark_lines
+*&---------------------------------------------------------------------*
+*&      Module  TC1_FIELD_VALIDATION  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE TC1_FIELD_VALIDATION INPUT.
+
+  CASE SY-UCOMM.
+
+  WHEN 'BACK' OR 'EXIT' OR 'CANCEL'.
+
+  IF GS_FAMILY-RELATIONSHIP IS NOT INITIAL.
+
+  IF GS_FAMILY-NAME IS INITIAL.
+     MESSAGE 'Enter the Name' TYPE 'E'.
+  ENDIF.
+
+  IF GS_FAMILY-DOB IS INITIAL.
+     MESSAGE 'Enter the Date of birth' TYPE 'E'.
+  ENDIF.
+
+  ENDIF.
+
+  ENDCASE.
+
+ENDMODULE.
+
+
+MODULE GET_GENDER INPUT.
+
+   clear : gt_desig[], gs_desig.
+
+   gs_desig-DESIG = 'M'.
+   append gs_desig to gt_desig.
+   gs_desig-desig = 'F'.
+   append gs_desig to gt_desig.
+   gs_desig-desig = 'A'.
+   append gs_desig to gt_desig.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield               = 'DESIG' "internal table field
+      dynpprog               = sy-cprog "program name
+      dynpnr                 = sy-dynnr "screen number
+      dynprofield            = 'GS_FAMILY-GENDER' "screen field name
+      value_org              = 'S'
+    TABLES
+      value_tab              = gt_desig "internal table
+    EXCEPTIONS
+      PARAMETER_ERROR        = 1
+      NO_VALUES_FOUND        = 2
+      OTHERS                 = 3.
+
+  IF sy-subrc  <> 0.
+    MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+            WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ENDIF.
+
+
+ENDMODULE.
+
+
+
+*&SPWIZARD: OUTPUT MODULE FOR TC 'TC2'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: UPDATE LINES FOR EQUIVALENT SCROLLBAR
+MODULE TC2_CHANGE_TC_ATTR OUTPUT.
+  DESCRIBE TABLE GT_EXP LINES TC2-lines.
+
+  IF GT_EXP[] IS INITIAL.
+     CLEAR : GS_EXP.
+
+   DO 4 TIMES.
+      APPEND GS_EXP TO GT_EXP.
+   ENDDO.
+
+
+  ENDIF.
+
+ENDMODULE.
+
+*&SPWIZARD: OUTPUT MODULE FOR TC 'TC2'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: GET LINES OF TABLECONTROL
+MODULE TC2_GET_LINES OUTPUT.
+  G_TC2_LINES = SY-LOOPC.
+ENDMODULE.
+
+*&SPWIZARD: INPUT MODULE FOR TC 'TC2'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: MODIFY TABLE
+MODULE TC2_MODIFY INPUT.
+  MODIFY GT_EXP
+    FROM GS_EXP
+    INDEX TC2-CURRENT_LINE.
+ENDMODULE.
+
+*&SPWIZARD: INPUT MODUL FOR TC 'TC2'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: MARK TABLE
+MODULE TC2_MARK INPUT.
+  DATA: g_TC2_wa2 like line of GT_EXP.
+    if TC2-line_sel_mode = 1
+    and GS_EXP-MARK = 'X'.
+     loop at GT_EXP into g_TC2_wa2
+       where MARK = 'X'.
+       g_TC2_wa2-MARK = ''.
+       modify GT_EXP
+         from g_TC2_wa2
+         transporting MARK.
+     endloop.
+  endif.
+  MODIFY GT_EXP
+    FROM GS_EXP
+    INDEX TC2-CURRENT_LINE
+    TRANSPORTING MARK.
+ENDMODULE.
+
+*&SPWIZARD: INPUT MODULE FOR TC 'TC2'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: PROCESS USER COMMAND
+MODULE TC2_USER_COMMAND INPUT.
+  OK_CODE = SY-UCOMM.
+  PERFORM USER_OK_TC USING    'TC2'
+                              'GT_EXP'
+                              'MARK'
+                     CHANGING OK_CODE.
+  SY-UCOMM = OK_CODE.
+ENDMODULE.
+
