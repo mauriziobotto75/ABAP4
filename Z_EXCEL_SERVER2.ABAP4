@@ -1,0 +1,201 @@
+REPORT z_excel_server2.
+
+TYPES: BEGIN OF ty_dati,
+         ebeln TYPE ekko-ebeln,
+         bsart TYPE ekko-bsart,
+         aedat TYPE ekko-aedat,
+         ernam TYPE ekko-ernam,
+       END OF ty_dati,
+       tt_dati TYPE STANDARD TABLE OF ty_dati.
+
+DATA : g_xstring   TYPE xstring,
+       gt_bintab   TYPE solix_tab,
+       gt_dati     TYPE tt_dati,
+       gt_fieldcat TYPE lvc_t_fcat.
+
+SELECTION-SCREEN: BEGIN OF BLOCK block1 WITH FRAME TITLE text1.
+PARAMETERS: p_filese TYPE dxlpath LOWER CASE.
+SELECTION-SCREEN: END OF BLOCK block1.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_filese.
+*Search file in server directory
+  PERFORM search_server.
+
+
+START-OF-SELECTION.
+
+  FREE: gt_bintab, gt_dati, gt_fieldcat.
+  CLEAR: g_xstring.
+
+  PERFORM estrai_dati TABLES gt_dati.
+
+  IF NOT gt_dati[] IS INITIAL.
+    PERFORM crea_excel USING gt_dati gt_fieldcat
+                       CHANGING g_xstring.
+
+    PERFORM write_excel USING g_xstring.
+
+  ELSE.
+    MESSAGE e000(db) WITH 'Non esistono dati da estrarre'.
+  ENDIF.
+
+  FREE: gt_dati.
+
+END-OF-SELECTION.
+
+*&---------------------------------------------------------------------*
+*&      Form  SEARCH_SERVER
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM search_server .
+  CLEAR: p_filese.
+  CALL FUNCTION '/SAPDMC/LSM_F4_SERVER_FILE'
+    IMPORTING
+      serverfile       = p_filese
+    EXCEPTIONS
+      canceled_by_user = 1
+      OTHERS           = 2.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  ESTRAI_DATI
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM estrai_dati TABLES pt_dati TYPE tt_dati.
+
+* Estraggo dati da esportare
+  SELECT ebeln bsart aedat ernam
+     INTO TABLE pt_dati
+     FROM ekko
+     UP TO 10 ROWS
+     ORDER BY PRIMARY KEY.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  CREA_EXCEL
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM crea_excel USING pt_dati     TYPE tt_dati
+                      pt_fieldcat TYPE lvc_t_fcat
+             CHANGING p_xstring.
+
+  DATA: is_layout     TYPE lvc_s_layo,
+        it_sort       TYPE lvc_t_sort,
+        it_filt       TYPE lvc_t_filt,
+        it_hyperlinks TYPE lvc_t_hype.
+
+  DATA(lt_data) = REF #( pt_dati ).
+
+
+** PER VERSIONI PRECEDENTI DI SAP, INVECE DI USARE L'ISTRUZIONE PRECEDENTE
+** USARE QUESTE ISTRUZIONI COMMENTATE, E COMMENTATE QUELLA PRECEDENTE
+**  DATA: lt_data2 TYPE REF TO data.
+**  FIELD-SYMBOLS: <ltfs_data2> TYPE STANDARD TABLE.
+**  CREATE DATA lt_data2 type STANDARD TABLE OF ty_dati.
+**  aSSIGN lt_data2->* TO <ltfs_data2>.
+**  <ltfs_data2>[] = pt_dati[].
+** PER VERSIONI PRECEDENTI
+
+  CLEAR: is_layout.
+  FREE: it_sort, it_filt, it_hyperlinks.
+
+  IF pt_fieldcat IS INITIAL.
+    FIELD-SYMBOLS: <tab> TYPE STANDARD TABLE.
+    ASSIGN lt_data->* TO <tab>.
+** PER VERSIONI PRECEDENTI DI SAP, INVECE DI USARE L'ISTRUZIONE PRECEDENTE
+** USARE QUESTA ISTRUZIONE COMMENTATA, E COMMENTATE QUELLA PRECEDENTE
+*    ASSIGN lt_data2->* TO <tab>.
+    TRY.
+        cl_salv_table=>factory(
+        EXPORTING
+          list_display = abap_false
+        IMPORTING
+          r_salv_table = DATA(salv_table)
+        CHANGING
+          t_table      = <tab> ).
+
+        DATA(lt_fcat) = cl_salv_controller_metadata=>get_lvc_fieldcatalog(
+                                 r_columns      = salv_table->get_columns( )
+                                 r_aggregations = salv_table->get_aggregations( ) ).
+      CATCH cx_salv_msg.
+        RETURN.
+    ENDTRY.
+
+  ELSE.
+    lt_fcat = pt_fieldcat.
+  ENDIF.
+
+  cl_salv_bs_lex=>export_from_result_data_table(
+    EXPORTING
+      is_format            = if_salv_bs_lex_format=>mc_format_xlsx
+      ir_result_data_table =  cl_salv_ex_util=>factory_result_data_table(
+                                              r_data                      = lt_data
+                                              s_layout                    = is_layout
+                                              t_fieldcatalog              = lt_fcat
+                                              t_sort                      = it_sort
+                                              t_filter                    = it_filt
+                                              t_hyperlinks                = it_hyperlinks )
+    IMPORTING
+      er_result_file       = p_xstring ).
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  WRITE_EXCEL
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_G_XSTRING  text
+*----------------------------------------------------------------------*
+FORM write_excel  USING p_xstring.
+
+  DATA: lt_rawdata      TYPE solix_tab,
+        lv_bytecount    TYPE i,
+        lv_bytes_remain TYPE i.
+
+  FIELD-SYMBOLS: <rawdata> LIKE LINE OF lt_rawdata.
+
+  CLEAR: lv_bytecount, lv_bytes_remain.
+  FREE: lt_rawdata.
+
+  lt_rawdata = cl_bcs_convert=>xstring_to_solix( iv_xstring  = p_xstring ).
+  lv_bytecount = xstrlen( p_xstring ).
+
+  OPEN DATASET p_filese FOR OUTPUT IN BINARY MODE.
+  CHECK sy-subrc = 0.
+
+  lv_bytes_remain = lv_bytecount.
+
+  UNASSIGN <rawdata>.
+  LOOP AT lt_rawdata ASSIGNING <rawdata>.
+
+    AT LAST.
+      CHECK lv_bytes_remain >= 0.
+      TRANSFER <rawdata> TO p_filese LENGTH lv_bytes_remain.
+      EXIT.
+    ENDAT.
+
+    TRANSFER <rawdata> TO p_filese.
+    SUBTRACT 255 FROM lv_bytes_remain.  " Solix has length 255
+  ENDLOOP.
+
+  CLOSE DATASET p_filese.
+
+  IF sy-repid <> sy-cprog AND sy-cprog IS NOT INITIAL.  " no need to display anything if download was selected and report was called for demo purposes
+    LEAVE PROGRAM.
+  ELSE.
+    MESSAGE 'File Creato' TYPE 'S'.
+  ENDIF.
+
+ENDFORM.
