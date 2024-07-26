@@ -1,0 +1,263 @@
+REPORT ZDEMO_LONG_TEXT_EDITOR.
+
+ tables : ekko.
+
+ data : editor_container type ref to CL_GUI_CUSTOM_CONTAINER,
+        text_editor type REF TO CL_GUI_TEXTEDIT.
+
+ CONSTANTS : line_length type i VALUE 132.
+
+ data : gt_elines(line_length) type c occurs 0,
+        gv_line(line_length) type c,
+
+        gt_line type STANDARD TABLE OF tline,
+        gs_line type tline,
+        gv_name type TDOBNAME.
+
+
+
+ SELECTION-SCREEN begin of BLOCK b1 with FRAME TITLE text-001.
+   PARAMETERS : p_ebeln type ekko-ebeln.
+ SELECTION-SCREEN end of BLOCK b1.
+
+
+
+ START-OF-SELECTION.
+      call SCREEN 0100.
+
+ end-of-SELECTION.
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0100  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE STATUS_0100 OUTPUT.
+  SET PF-STATUS 'PF1'.
+  SET TITLEBAR 'T1'.
+
+
+  if text_editor is INITIAL.
+
+  create OBJECT EDITOR_CONTAINER
+    EXPORTING
+*      PARENT                      =     " Parent container
+      CONTAINER_NAME              =   'TEXTEDITOR'  " Name of the Screen CustCtrl Name to Link Container To
+*      STYLE                       =     " Windows Style Attributes Applied to this Container
+*      LIFETIME                    = LIFETIME_DEFAULT    " Lifetime
+*      REPID                       =     " Screen to Which this Container is Linked
+*      DYNNR                       =     " Report To Which this Container is Linked
+*      NO_AUTODEF_PROGID_DYNNR     =     " Don't Autodefined Progid and Dynnr?
+    EXCEPTIONS
+      CNTL_ERROR                  = 1
+      CNTL_SYSTEM_ERROR           = 2
+      CREATE_ERROR                = 3
+      LIFETIME_ERROR              = 4
+      LIFETIME_DYNPRO_DYNPRO_LINK = 5
+      OTHERS                      = 6
+    .
+  IF SY-SUBRC <> 0.
+*   MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*              WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ENDIF.
+
+
+  create OBJECT TEXT_EDITOR
+    EXPORTING
+*      MAX_NUMBER_CHARS           =     " maximum number of characters insertable into editor control
+*      STYLE                      = 0    " control style, if initial a defined value is choosen
+      WORDWRAP_MODE              = CL_GUI_TEXTEDIT=>WORDWRAP_AT_FIXED_POSITION
+      WORDWRAP_POSITION          = line_length    " position of wordwrap, only makes sense with wordwrap_mode=2
+      WORDWRAP_TO_LINEBREAK_MODE =    CL_GUI_TEXTEDIT=>TRUE
+*      FILEDROP_MODE              = DROPFILE_EVENT_OFF    " event mode to handle drop of files on control
+      PARENT                     =  editor_container   " Parent Container
+*      LIFETIME                   =     " for life time management
+*      NAME                       =     " name for the control
+    EXCEPTIONS
+      ERROR_CNTL_CREATE          = 1
+      ERROR_CNTL_INIT            = 2
+      ERROR_CNTL_LINK            = 3
+      ERROR_DP_CREATE            = 4
+      GUI_TYPE_NOT_SUPPORTED     = 5
+      OTHERS                     = 6
+    .
+  IF SY-SUBRC <> 0.
+*   MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*              WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ENDIF.
+
+
+  gv_name = p_ebeln.
+  CONDENSE gv_name.
+
+  clear : gt_line[].
+
+  CALL FUNCTION 'READ_TEXT'
+    EXPORTING
+     CLIENT                        = SY-MANDT
+      ID                            = 'Z001'
+      LANGUAGE                      = sy-LANGU
+      NAME                          = gv_name
+      OBJECT                        = 'ZEKKO'
+*     ARCHIVE_HANDLE                = 0
+*     LOCAL_CAT                     = ' '
+*   IMPORTING
+*     HEADER                        =
+*     OLD_LINE_COUNTER              =
+    TABLES
+      LINES                         = gt_line
+   EXCEPTIONS
+     ID                            = 1
+     LANGUAGE                      = 2
+     NAME                          = 3
+     NOT_FOUND                     = 4
+     OBJECT                        = 5
+     REFERENCE_CHECK               = 6
+     WRONG_ACCESS_TO_ARCHIVE       = 7
+     OTHERS                        = 8
+            .
+  IF SY-SUBRC <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+
+ if gt_line[] is NOT INITIAL.
+
+ clear : gt_elines.
+
+ loop at gt_line into gs_line.
+
+ append gs_line-TDLINE  to gt_elines.
+
+ clear : gs_line.
+ endloop.
+
+ call METHOD text_editor->SET_TEXT_AS_R3TABLE
+   EXPORTING
+     TABLE           = gt_elines    " table with text
+   EXCEPTIONS
+     ERROR_DP        = 1
+     ERROR_DP_CREATE = 2
+     OTHERS          = 3
+   .
+ IF SY-SUBRC <> 0.
+*  MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*             WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+ ENDIF.
+
+
+
+  endif.
+
+  endif.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  EXIT  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE EXIT INPUT.
+       set SCREEN 0.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE USER_COMMAND_0100 INPUT.
+
+  case sy-ucomm.
+
+  when 'BACK'  or 'EXIT' or 'CANCEL'.
+     set SCREEN 0.
+
+  when 'SAVE'.
+      perform save.
+
+  ENDCASE.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Form  SAVE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM SAVE .
+
+    call METHOD text_editor->GET_TEXT_AS_R3TABLE
+*      EXPORTING
+*        ONLY_WHEN_MODIFIED     = FALSE    " get text only when modified
+      IMPORTING
+        TABLE                  =  gt_elines   " text as R/3 table
+*        IS_MODIFIED            =     " modify status of text
+      EXCEPTIONS
+        ERROR_DP               = 1
+        ERROR_CNTL_CALL_METHOD = 2
+        ERROR_DP_CREATE        = 3
+        POTENTIAL_DATA_LOSS    = 4
+        OTHERS                 = 5
+      .
+    IF SY-SUBRC <> 0.
+*     MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*                WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+    ENDIF.
+
+ clear : gt_line[], gs_line, gv_line.
+
+
+ loop at gt_elines into gv_line.
+
+ gs_line-TDFORMAT = '*'.
+ gs_line-TDLINE   = gv_line.
+ append gs_line to gt_line.
+
+
+ clear : gs_line,  gv_line.
+ ENDLOOP.
+
+"call the create text FM
+
+  gv_name  = p_ebeln.
+  CONDENSE gv_name.
+
+
+  CALL FUNCTION 'CREATE_TEXT'
+    EXPORTING
+      FID               = 'Z001'
+      FLANGUAGE         = sy-LANGU
+      FNAME             = gv_name
+      FOBJECT           = 'ZEKKO'
+*     SAVE_DIRECT       = 'X'
+*     FFORMAT           = '*'
+    TABLES
+      FLINES            = gt_line
+   EXCEPTIONS
+     NO_INIT           = 1
+     NO_SAVE           = 2
+     OTHERS            = 3
+            .
+  IF SY-SUBRC <> 0.
+* Implement suitable error handling here
+
+   message 'Error while saving the text' TYPE 'I'.
+
+
+  else.
+   message 'Text saved successfully' TYPE 'I'.
+   SET SCREEN 0.
+
+
+  ENDIF.
+
+
+
+
+
+
+
+
+ENDFORM.
